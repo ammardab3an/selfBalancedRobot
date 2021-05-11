@@ -7,174 +7,18 @@
 #include <stdlib.h>	/* Include standard library file */
 #include <stdio.h>	/* Include USART header file */
 #include <util/twi.h>
+#include <avr/interrupt.h>
+#include "MPU6050_res_define.h"							/* Include MPU6050 register define file */
+#include "I2C_Master_H_file.h"							/* Include I2C Master header file */
+#include "USART_RS232_H_file.h"
 
-#define I2C_TIMER_DELAY 0xFF
-#define SCL_CLOCK  400000L
-#define BAUD_PRESCALE (((F_CPU / (19200 * 16UL))) - 1)
-#define TW_START		0x08
-#define TW_REP_START		0x10
+#define RAD_TO_DEG 57.29577951308232
 
-extern void I2C_init(void);
-extern void I2C_Stop(void);
-extern unsigned char I2C_Start(unsigned char addr);
-extern unsigned char I2C_Rep_Start(unsigned char addr);
-extern void I2C_Start_Wait(unsigned char addr);
-extern unsigned char I2C_Write(unsigned char data);
-extern unsigned char I2C_ReadAck(unsigned char ack);
-extern unsigned char I2C_ReadNak(unsigned char nack);
-extern unsigned char I2C_Read(unsigned char ack);
-
-void I2C_init(void)
-{
-	/* initialize TWI clock: 100 kHz clock, TWPS = 0 => prescaler = 1 */
-	
-	TWSR = 0;                         /* no prescaler */
-	TWBR = ((F_CPU/SCL_CLOCK)-16)/2;  /* must be > 10 for stable operation */
-
-}
-
-unsigned char I2C_Start(unsigned char address)
-{
-	uint32_t  i2c_timer = 0;
-	uint8_t   twst;
-
-	// send START condition
-	TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
-
-	// wait until transmission completed
-	i2c_timer = I2C_TIMER_DELAY;
-	while(!(TWCR & (1<<TWINT)) && i2c_timer--);
-	if(i2c_timer == 0)
-	return 1;
-
-	// check value of TWI Status Register. Mask prescaler bits.
-	twst = TW_STATUS & 0xF8;
-	if ( (twst != TW_START) && (twst != TW_REP_START)) return 1;
-
-	// send device address
-	TWDR = address;
-	TWCR = (1<<TWINT) | (1<<TWEN);
-
-	// wail until transmission completed and ACK/NACK has been received
-	i2c_timer = I2C_TIMER_DELAY;
-	while(!(TWCR & (1<<TWINT)) && i2c_timer--);
-	if(i2c_timer == 0)
-	return 1;
-
-	// check value of TWI Status Register. Mask prescaler bits.
-	twst = TW_STATUS & 0xF8;
-	if ( (twst != TW_MT_SLA_ACK) && (twst != TW_MR_SLA_ACK) ) return 1;
-
-	return 0;
-}
-
-void I2C_Start_Wait(unsigned char address)
-{
-	uint32_t  i2c_timer = 0;
-	uint8_t   twst;
-
-	while ( 1 )
-	{
-		// send START condition
-		TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
-		
-		// wait until transmission completed
-		i2c_timer = I2C_TIMER_DELAY;
-		while(!(TWCR & (1<<TWINT)) && i2c_timer--);
-
-		// check value of TWI Status Register. Mask prescaler bits.
-		twst = TW_STATUS & 0xF8;
-		if ( (twst != TW_START) && (twst != TW_REP_START)) continue;
-		
-		// send device address
-		TWDR = address;
-		TWCR = (1<<TWINT) | (1<<TWEN);
-		
-		// wail until transmission completed
-		i2c_timer = I2C_TIMER_DELAY;
-		while(!(TWCR & (1<<TWINT)) && i2c_timer--);
-		
-		// check value of TWI Status Register. Mask prescaler bits.
-		twst = TW_STATUS & 0xF8;
-		if ( (twst == TW_MT_SLA_NACK )||(twst ==TW_MR_DATA_NACK) ){
-			/* device busy, send stop condition to terminate write operation */
-			TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
-			
-			// wait until stop condition is executed and bus released
-			i2c_timer = I2C_TIMER_DELAY;
-			while((TWCR & (1<<TWSTO)) && i2c_timer--);
-			continue;
-		}
-		break;
-	}
-}
-
-unsigned char I2C_Rep_Start(unsigned char address){	
-	return I2C_Start( address );  
-}
-
-void I2C_Stop(void)
-{
-	uint32_t  i2c_timer = 0;
-
-	/* send stop condition */
-	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
-	
-	// wait until stop condition is executed and bus released
-	i2c_timer = I2C_TIMER_DELAY;
-	while((TWCR & (1<<TWSTO)) && i2c_timer--);
-
-}
-
-unsigned char I2C_Write( unsigned char data )
-{
-	uint32_t  i2c_timer = 0;
-	uint8_t   twst;
-	
-	// send data to the previously addressed device
-	TWDR = data;
-	TWCR = (1<<TWINT) | (1<<TWEN);
-
-	// wait until transmission completed
-	i2c_timer = I2C_TIMER_DELAY;
-	while(!(TWCR & (1<<TWINT)) && i2c_timer--);
-	if(i2c_timer == 0)
-	return 1;
-
-	// check value of TWI Status Register. Mask prescaler bits
-	twst = TW_STATUS & 0xF8;
-	if( twst != TW_MT_DATA_ACK) return 1;
-	return 0;
-}
-
-unsigned char I2C_ReadAck(unsigned char ack)
-{
-	uint32_t  i2c_timer = 0;
-
-	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA);
-	i2c_timer = I2C_TIMER_DELAY;
-	while(!(TWCR & (1<<TWINT)) && i2c_timer--);
-	if(i2c_timer == 0)
-	return 0;
-
-	return TWDR;
-}
-
-unsigned char I2C_ReadNak(unsigned char ack)
-{
-	uint32_t  i2c_timer = 0;
-
-	TWCR = (1<<TWINT) | (1<<TWEN);
-	i2c_timer = I2C_TIMER_DELAY;
-	while(!(TWCR & (1<<TWINT)) && i2c_timer--);
-	if(i2c_timer == 0)
-	return 0;
-	
-	return TWDR;
-}
-
-float kalman = 0, kalmanX = 0, kalmanY = 0, dt = 0;
-float Acc_x, Acc_y, Acc_z, Gyro_x, Gyro_y, Gyro_z;
+double dt, count;
+double Acc_x, Acc_y, Acc_z, Gyro_x, Gyro_y, Gyro_z, Temperature;
+double accAngleX, accAngleY, accAngleZ, gyroAngleX, gyroAngleY, gyroAngleZ;
+double AccErrorX, AccErrorY, AccErrorZ, GyroErrorX, GyroErrorY, GyroErrorZ;
+double roll,pitch;
 
 void Gyro_Init()										/* Gyro initialization function */
 {
@@ -394,231 +238,124 @@ void MPU_Start_Loc()
 {
 	I2C_Start_Wait(0xD0);								/* I2C start with device write address */
 	I2C_Write(0x3B);							/* Write start location address from where to read */
-	I2C_Rep_Start(0xD1);							/* I2C start with device read address */
+	I2C_Repeated_Start(0xD1);							/* I2C start with device read address */
 }
 
 void Read_RawValue()  //read the raw values of the sensor
 {
-	MPU_Start_Loc();
-
-  //Read Accelerometer values
-	Acc_x = ~((((int)I2C_ReadAck(0xd2)<<8) | (int)I2C_ReadAck(0xd2))-1);
-	Acc_y = ~((((int)I2C_ReadAck(0xd2)<<8) | (int)I2C_ReadAck(0xd2))-1);
-	Acc_z = ~((((int)I2C_ReadAck(0xd2)<<8) | (int)I2C_ReadAck(0xd2))-1);
+	MPU_Start_Loc();									/* Read Gyro values */
+	Acc_x = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
+	Acc_y = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
+	Acc_z = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
+	Temperature = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
+	Gyro_x = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
+	Gyro_y = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
+	Gyro_z = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Nack());
+	I2C_Stop();
 	
-  //Temperature = (((int)I2C_ReadAck(0xd2)<<8) | (int)I2C_ReadAck(0x69)); //uncomment to read temperature values
+	Acc_x = Acc_x/16384.0;	//Xa						/* Divide raw value by sensitivity scale factor to get real values */
+	Acc_y = Acc_y/16384.0;	//Ya
+	Acc_z= Acc_z/16384.0;	//Za
+			
+	Gyro_x = Gyro_x/16.4;	//Xg
+	Gyro_y = Gyro_y/16.4;	//Yg
+	Gyro_z = Gyro_z/16.4;	//Zg
+}
+
+void calculate_IMU_error(void) {
 	
-  //Read Gyro values
-	Gyro_x = ~((((int)I2C_ReadAck(0xd2)<<8) | (int)I2C_ReadAck(0xd2))-1);
-	Gyro_y = ~((((int)I2C_ReadAck(0xd2)<<8) | (int)I2C_ReadAck(0xd2))-1);
-	Gyro_z = ~((((int)I2C_ReadAck(0xd2)<<8) | (int)I2C_ReadNak(0))-1);
-  
-	I2C_Stop(); //stop I2C serial communication
-}
+	int c = 0;
+	while (c < 200) {
+		
+		Read_RawValue();
+		
+		AccErrorX = AccErrorX + ((atan((Acc_y) / sqrt(pow((Acc_x), 2) + pow((Acc_z), 2))) * RAD_TO_DEG));
+		AccErrorY = AccErrorY + ((atan(-1 * (Acc_x) / sqrt(pow((Acc_y), 2) + pow((Acc_z), 2))) * RAD_TO_DEG));
+		AccErrorZ = AccErrorZ + ((atan((Acc_z) / sqrt(pow((Acc_x), 2) + pow((Acc_z), 2))) * RAD_TO_DEG));
 
-void USART_init() //initialize the USART
-{
-	UCSRB |= (1 << RXEN) | (1 << TXEN);   /* Turn on the transmission and reception */
-	UCSRC |= (1 << URSEL) | (1 << UCSZ0) | (1 << UCSZ1); /* Use 8-bit character sizes */
-
-	UBRRL = BAUD_PRESCALE; 				  /* Load lower 8-bits of the baud rate value */
-	UBRRH = (BAUD_PRESCALE >> 8);		  /*Load upper 8-bits*/
-}
-
-unsigned char UART_RxChar()
-{
-	while ((UCSRA & (1 << RXC)) == 0); /*Do nothing until data have been received*/
-	return(UDR);				       /* return the byte*/
-}
-
-void UART_TxChar(char ch)
-{
-	while (! (UCSRA & (1<<UDRE)));     /*Wait for empty transmit buffer*/
-	UDR = ch ;
-}
-
-//function to send string to the USART
-void USART_SendString(char *str)
-{
-	unsigned char j=0;
-	
-	while (str[j]!=0)	               /*send string up to null */
-	{
-		UART_TxChar(str[j]);
-		j++;
+		GyroErrorX = GyroErrorX + Gyro_x;
+		GyroErrorY = GyroErrorY + Gyro_y;
+		GyroErrorZ = GyroErrorZ + Gyro_z;
+		
+		c++;
 	}
+	
+	AccErrorX = AccErrorX / 200;
+	AccErrorY = AccErrorY / 200;
+	AccErrorZ = AccErrorZ / 200;
+
+	GyroErrorX = GyroErrorX / 200;
+	GyroErrorY = GyroErrorY / 200;
+	GyroErrorZ = GyroErrorZ / 200;
 }
 
-//kalman filter parameter for X
-double q_angle=0.008,q_bias=0.003,r_measure=0.003;
-double angleX=0,biasX=0,rateX;
-double pX[2][2]={{0,0},{0,0}},kX[2],yX,sX;
-
-//Kalman filter parameter for Y
-double angleY=0,biasY=0,rateY;
-double pY[2][2]= {{0,0},{0,0}},kY[2],yY,sY;
-
-float kalman_get_angle_X(float newAngle, float newRate, float dt)
-{
-	rateX = newRate-biasX;
-	angleX += dt*rateX;
-
-	//update error estimation error covariance
-	pX[0][0] += dt * (dt*pX[1][1]-pX[0][1]-pX[1][0]+q_angle);
-	pX[0][1] -= dt * pX[1][1];
-	pX[1][0] -= dt * pX[1][1];
-	pX[1][1] += q_bias * dt;
-
-	//calculate kalman gain
-	sX = pX[0][0] + r_measure;
-
-	kX[0] = pX[0][0]/sX;
-	kX[1] = pX[1][0]/sX;
-
-	yX=newAngle-angleX;
-	angleX+=kX[0]*yX;
-	biasX+=kX[1]*yX;
-
-	//Calculate estimation error covariance
-	pX[0][0]-=kX[0]*pX[0][0];
-	pX[0][1]-=kX[0]*pX[0][1];
-	pX[1][0]-=kX[1]*pX[0][0];
-	pX[1][1]-=kX[1]*pX[0][1];
-
-	return angleX;
+void timer_setup(){
+	TCCR1A = 0x00;
+	TIMSK |= _BV(TOIE1);
+	TCCR1B |= _BV(CS11);
+	TCCR1B &= ~( _BV(CS12)  | _BV(CS10)); // prescaler=8
 }
 
-float kalman_get_angle_Y(float newAngle, float newRate, float dt)
-{
-	rateY = newRate-biasY;
-	angleY += dt*rateY;
-
-	//update error estimation error covariance
-	pY[0][0] += dt * (dt*pY[1][1]-pY[0][1]-pY[1][0]+q_angle);
-	pY[0][1] -= dt * pY[1][1];
-	pY[1][0] -= dt * pY[1][1];
-	pY[1][1] += q_bias * dt;
-
-	//calculate kalman gain
-	sY = pY[0][0] + r_measure;
-
-	kY[0] = pY[0][0]/sY;
-	kY[1] = pY[1][0]/sY;
-
-	yY=newAngle-angleY;
-	angleY+=kY[0]*yY;
-	biasY+=kY[1]*yY;
-
-	//Calculate estimation error covariance
-	pY[0][0]-=kY[0]*pY[0][0];
-	pY[0][1]-=kY[0]*pY[0][1];
-	pY[1][0]-=kX[1]*pY[0][0];
-	pY[1][1]-=kX[1]*pY[0][1];
-
-	return angleY;
+void get_time(double * dt){
+	cli();
+	uint8_t l = TCNT1L;
+	uint8_t h = TCNT1H;
+	uint16_t step = h<<8 | l;
+	*dt = (double)step*5e-7 + count*0.032768;
+	count = 0;
+	sei();
 }
 
-float roll,pitch,prev_gyroX,prev_gyroY,prev_gyroZ,prev_kalmanX,prev_kalmanY,Gyro_Rx,Gyro_Ry,gyroAngleX,gyroAngleY;
+SIGNAL(TIMER1_OVF_vect){
+	count += 1;
+	//TCNT1H = 0x00;
+	//TCNT1L = 0x00;
+}
 
 int main()
 {
-	char buffer[20], float_[10];
+	char buffer[20], double_[10];
 	
-	I2C_init();											/* Initialize I2C */
-	Gyro_Init();										/* Initialize Gyro */
-	USART_init();									/* Initialize USART with 9600 baud rate */
-	
-	//DDRB = 0XFF;
-//
-	//DDRD=0x80; /* PD7 pin of PORTD is declared output (PWM2 pin of DC Motor Driver is connected) */
-	//DDRA=0x0f; /*PC0,PC1,PC2 and PC3 pins of PortC are declared output ( i/p1,i/p2,i/p3 and i/p4 pins of DC Motor Driver areconnected)*/
-	//TCNT0=0xf8;
-	//TCNT2=0xf8;
-	//TCCR0=0x6C; // fast pwm mode,presclar 256,frequency set to 3.90625,non-inverting mode
-	//TCCR2=0x6C;
+	I2C_Init();
+	Gyro_Init();
+	I2C_Init();
+	USART_Init(19200);
+	timer_setup();
+	calculate_IMU_error();
 	
 	while(1)
 	{
 		Read_RawValue();
-
-		Acc_x = Acc_x/16384.0;	//Xa						/* Divide raw value by sensitivity scale factor to get real values */
-		Acc_y = Acc_y/16384.0;	//Ya
-		Acc_z= Acc_z/16384.0;	//Za
+		get_time(&dt);
 		
-		Gyro_x = Gyro_x/16.4;	//Xg
-		Gyro_y = Gyro_y/16.4;	//Yg
-		Gyro_z = Gyro_z/16.4;	//Zg
-
-		dt=0.011;
-
-		roll=atan(Acc_x/sqrt(Acc_x*Acc_x + Acc_z*Acc_z))*57.324;
-		pitch=atan(-Acc_x/sqrt(Acc_y*Acc_y + Acc_z*Acc_z))*57.324;
-
-		angleX=roll;
-		angleY=pitch;
-
-		prev_gyroX=Gyro_x;
-		prev_gyroY=Gyro_y;
-		prev_gyroZ=Gyro_z;
-
-		prev_kalmanX=kalmanX;
-		prev_kalmanY=kalmanY;
-
-		Gyro_Rx=Gyro_x;
-		Gyro_Ry=Gyro_y;
-
-		//calculating kalman angle.This fixes the transition problemwhen accerlerometer angle jumps between -180
-		if((roll<-90 && kalmanX > 90) || (roll>90 && kalmanX < -90))
-		{
-			angleX = roll;
-			kalman = roll;
-		}
-		else kalmanX=kalman_get_angle_X(roll,Gyro_Rx,dt);
+		// Calculating Roll and Pitch from the accelerometer data
+		accAngleX = (atan(Acc_y / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorX;
+		accAngleY = (atan(-1 * Acc_x / sqrt(pow(Acc_y, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorY;
+		accAngleZ = (atan(Acc_z / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorZ;
 		
-		if(abs(kalmanX)>90)
-		Gyro_Ry=-Gyro_Rx;
-		kalmanY = kalman_get_angle_Y(pitch,Gyro_Ry,dt);
+		// Correct the outputs with the calculated error values
+		Gyro_x = Gyro_x - GyroErrorX;
+		Gyro_y = Gyro_y - GyroErrorY;
+		Gyro_z = Gyro_z - GyroErrorZ;
 
-		if((pitch<-90 && kalmanY>90) || (pitch>90 && kalmanY<-90))
-		{
-			angleY = pitch;
-			kalmanY=pitch;
-		}
-		else kalmanY = kalman_get_angle_Y(pitch,Gyro_Ry,dt);
-
-		if(abs(kalmanY)>90)
-		Gyro_Rx = -Gyro_Rx;
-		kalmanX=kalman_get_angle_X(roll,Gyro_Rx,dt);
-		//("kalmanX angle:%f\t\tkalmanY angle:%f\n\n");//,kalmanX,kalmanY);
+		// Currently the raw values are in degrees per seconds, deg/s, so we need to multiply by sendonds (s) to get the angle in degrees
+		gyroAngleX = gyroAngleX + Gyro_x * dt; // deg/s * s = deg
+		gyroAngleY = gyroAngleY + Gyro_y * dt;
+		gyroAngleZ = gyroAngleZ + Gyro_z * dt;
 		
-		gyroAngleX =(prev_kalmanX-kalmanX)*0.9;
-		gyroAngleY =(prev_kalmanY-kalmanY)*0.5;
-		Gyro_z = Gyro_z*0.05;
-
-		//Threshold sensor value
-		if(gyroAngleX < 0.6 && gyroAngleX > -0.6)
-		gyroAngleX=0;
-		if(gyroAngleY<0.6 && gyroAngleY > -0.6)
-		gyroAngleY=0;
-
-		dtostrf(gyroAngleX, 3, 2, float_ );					/* Take values in buffer to send all parameters over USART */
-		sprintf(buffer,"gyroAngleX = %s g    ",float_);
+		// Complementary filter - combine acceleromter and gyro angle values
+		gyroAngleX = 0.96 * gyroAngleX + 0.04 * accAngleX;
+		gyroAngleY = 0.96 * gyroAngleY + 0.04 * accAngleY;
+		
+		roll = gyroAngleX;
+		pitch = gyroAngleY;
+		
+		dtostrf(roll, 3, 2, double_);
+		sprintf(buffer, "%s/", double_);
 		USART_SendString(buffer);
-
-		dtostrf(gyroAngleY, 3, 2, float_ );					/* Take values in buffer to send all parameters over USART */
-		sprintf(buffer,"gyroAngleY = %s g\r\n",float_);
-		USART_SendString(buffer);
-
-		//if(gyroAngleY>0){
-			//PORTA=0x0a;
-			//_delay_us(2000);
-			//PORTA=0X05;
-			//_delay_us(1000);
-		//}
-		//
-		//OCR0=180;
-		//OCR2=180;
-		//OCR0=100;	/*OCR2 register value is set to 100*/
-		//OCR2=100; /*OCR2 register value is set to 100*/
+		
+		dtostrf(pitch, 3, 2, double_);
+		sprintf(buffer, "%s\n", double_);
+		USART_SendString(buffer);		
 	}
 }

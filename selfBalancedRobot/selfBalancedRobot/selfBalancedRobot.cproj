@@ -148,7 +148,22 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="I2C_Master_C_file.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="I2C_Master_H_file.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="main.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="MPU6050_res_define.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="USART_RS232_C_file.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="USART_RS232_H_file.h">
       <SubType>compile</SubType>
     </Compile>
   </ItemGroup>
