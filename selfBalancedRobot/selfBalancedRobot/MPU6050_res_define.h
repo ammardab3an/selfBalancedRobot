@@ -1,10 +1,3 @@
-/*
- * MPU6050_res_define.h
- *
- * Created: 04/21/2016 22:47:10
- *  Author: Suraj
- */ 
-
 
 #ifndef MPU6050_RES_DEFINE_H_
 #define MPU6050_RES_DEFINE_H_

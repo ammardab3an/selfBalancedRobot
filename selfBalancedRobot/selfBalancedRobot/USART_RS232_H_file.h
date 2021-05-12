@@ -1,9 +1,3 @@
-/*
- * USART_RS232_H_file.h
- * http://www.electronicwings.com
- *
- */ 
-
 
 #ifndef USART_RS232_H_FILE_H_				/* Define library H file if not defined */
 #define USART_RS232_H_FILE_H_
