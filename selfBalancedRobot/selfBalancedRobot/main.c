@@ -1,5 +1,5 @@
 
-#define F_CPU 16000000UL	/* Define CPU clock Frequency e.g. here its 8MHz */
+#define F_CPU 16000000UL
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -365,7 +365,7 @@ int main()
 	{
 		Read_RawValue();
 		//get_time_sec(&dt);
-		dt = 0.03;
+		dt=0.03;
 		
 		// Calculating Roll and Pitch from the accelerometer data
 		accAngleX = (atan(Acc_y / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorX;
@@ -383,8 +383,8 @@ int main()
 		gyroAngleZ = gyroAngleZ + Gyro_z * dt;
 		
 		// Complementary filter - combine acceleromter and gyro angle values
-		gyroAngleX = 0.98 * gyroAngleX + 0.02 * accAngleX;
-		gyroAngleY = 0.98 * gyroAngleY + 0.02 * accAngleY;
+		gyroAngleX = 0.96 * gyroAngleX + 0.04 * accAngleX;
+		gyroAngleY = 0.96 * gyroAngleY + 0.04 * accAngleY;
 		
 		roll = gyroAngleX;
 		pitch = gyroAngleY;
@@ -394,40 +394,48 @@ int main()
 			adc[i] = ADC_GetAdcValue(i);
 		}
 		
-		Kp = (double) adc[0] * (100.0 / 1024.0);
+		Kp = (double) adc[0] * (200.0 / 1024.0);
 		Ki = (double) adc[1] * (100.0 / 1024.0);
-		Kd = (double) adc[2] / 1024.0 / 2.0;
+		Kd = (double) adc[2] * (25.0 / 1024.0);
 		
 		error = pitch - target;
+		
 		sum_error += error;
 		
-		if(sum_error > 300) sum_error = 300;
-		if(sum_error < -300) sum_error = -300;
+		double mx_val = 300;
+		if(sum_error > mx_val) sum_error = mx_val;
+		if(sum_error < -mx_val) sum_error = -mx_val;
 		
-		motor_power = Kp * error + Ki * (sum_error) - Kd * (error - pre_error) / dt;
+		motor_power = Kp * (error) + Ki * (sum_error) + Kd * (error - pre_error) / dt;	
+		motor_power *= 100.0 / 2000.0;
+
 		pre_error = error;
 		
-		if((pitch > 70) || (pitch < -70)) motor_power = 0;
-		if((roll > 70) || (roll < -70)) motor_power = 0;
+		if((pitch > 50) || (pitch < -50)) motor_power = 0;
+		if((roll > 50) || (roll < -50)) motor_power = 0;
 		
 		if(motor_power >= 0){
 			
 			PORTB |= 1 << 1;
 			PORTB &= ~(1 << 2);
 			
-			duty_cycle = motor_power * 100.0/4000.0;
+			duty_cycle = motor_power;
 			if(duty_cycle > 100) duty_cycle = 100;
-			PWM_SetDutyCycle(0, duty_cycle);		
+			PWM_SetDutyCycle(0, duty_cycle);
 		}
-		else{
+		else{	
 			
 			PORTB &= ~(1 << 1);
 			PORTB |= 1 << 2;
 			
-			duty_cycle = -motor_power * 100.0/4000.0;
+			duty_cycle = -motor_power;
 			if(duty_cycle > 100) duty_cycle = 100;
 			PWM_SetDutyCycle(0, duty_cycle);
 		}
+		
+		
+		
+		//............................................................................//
 		
 		dtostrf(roll, 3, 2, double_);
 		sprintf(buffer, "%s/", double_);
