@@ -160,12 +160,6 @@
     <Compile Include="MPU6050_res_define.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="pwm.c">
-      <SubType>compile</SubType>
-    </Compile>
-    <Compile Include="pwm.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="stdutils.h">
       <SubType>compile</SubType>
     </Compile>

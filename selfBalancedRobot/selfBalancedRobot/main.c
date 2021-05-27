@@ -11,7 +11,6 @@
 #include "MPU6050_res_define.h"
 #include "I2C_Master_H_file.h"
 #include "USART_RS232_H_file.h"
-#include "pwm.h"
 
 #define RAD_TO_DEG 57.29577951308232
 
@@ -22,9 +21,12 @@ double AccErrorX, AccErrorY, AccErrorZ, GyroErrorX, GyroErrorY, GyroErrorZ;
 double roll,pitch;
 double error, sum_error, pre_error, motor_power, duty_cycle;
 double target = 0.0;
-
 double Kp, Ki, Kd;
+uint8_t cur_sign, lst_sign = 0;
 
+void PWM_Init();
+void PWM_SetDutyCycle(double dutyCycle);
+void PWM_Start();
 void Gyro_Init();
 void MPU_Start_Loc();
 void Read_RawValue();
@@ -34,6 +36,44 @@ void get_time_sec(double* dt);
 SIGNAL(TIMER1_OVF_vect);
 void ADC_Init();
 uint16_t ADC_GetAdcValue(uint8_t v_adcChannel_u8);
+
+void PWM_Init()
+{
+    TCNT0 = 0x00;
+	TCNT2 = 0X00;	
+    DDRB |= 1 << 3;
+	DDRD |= 1 << 7;
+}
+
+void PWM_SetDutyCycle(double dutyCycle)
+{
+	
+	dutyCycle = 2.55 * dutyCycle;
+	
+	double l_val, r_val;
+	
+	if(motor_power > 0){
+		l_val = 1.08 * dutyCycle;
+		r_val = dutyCycle;
+		
+	}
+	else{
+		l_val = 1.08 * dutyCycle;
+		r_val = dutyCycle;
+	}
+	
+	if(l_val > 255) l_val = 200;
+	if(r_val > 255) r_val = 200;
+	
+	OCR0 = (uint8_t) l_val;
+	OCR2 = (uint8_t) r_val;
+}
+
+void PWM_Start()
+{
+	TCCR0 = (1<<WGM00)|(1<<COM01)|(1<<CS01)|(1<<CS00);
+	TCCR2 = (1<<WGM20)|(1<<COM21)|(1<<CS22);
+}
 
 void Gyro_Init()										/* Gyro initialization function */
 {
@@ -351,12 +391,12 @@ int main()
 	I2C_Init();
 	USART_Init(19200);
 
-	PWM_Init(0);
-	PWM_SetDutyCycle(0, 0);
-	PWM_Start(0);
+	PWM_Init();
+	PWM_SetDutyCycle(0);
+	PWM_Start();
 	
 	Gyro_Init();
-	//timer_setup();
+	timer_setup();
 	calculate_IMU_error();
 	
 	char buffer[20], double_[10];	
@@ -364,8 +404,8 @@ int main()
 	while(1)
 	{
 		Read_RawValue();
-		//get_time_sec(&dt);
-		dt=0.03;
+		get_time_sec(&dt);
+		//dt=0.03;
 		
 		// Calculating Roll and Pitch from the accelerometer data
 		accAngleX = (atan(Acc_y / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorX;
@@ -394,46 +434,54 @@ int main()
 			adc[i] = ADC_GetAdcValue(i);
 		}
 		
-		Kp = (double) adc[0] * (200.0 / 1024.0);
-		Ki = (double) adc[1] * (100.0 / 1024.0);
-		Kd = (double) adc[2] * (25.0 / 1024.0);
+		Kp = (double) adc[0] * (10.0 / 1024.0);
+		Ki = (double) adc[1] * (0.5 / 1024.0);
+		Kd = (double) adc[2] * (0.3 / 1024.0);
 		
 		error = pitch - target;
 		
-		sum_error += error;
-		
-		double mx_val = 300;
-		if(sum_error > mx_val) sum_error = mx_val;
-		if(sum_error < -mx_val) sum_error = -mx_val;
-		
-		motor_power = Kp * (error) + Ki * (sum_error) + Kd * (error - pre_error) / dt;	
-		motor_power *= 100.0 / 2000.0;
+		if((pitch > 50) || (pitch < -50) || (roll > 50) || (roll < -50)){
+			PWM_SetDutyCycle(0);
+		}
+		else{
+			
+			sum_error += error * dt;
+			
+			double mx_val = 300;
+			if(sum_error > mx_val)
+			sum_error = mx_val;
+			if(sum_error < -mx_val)
+			sum_error = -mx_val;
+			
+			motor_power = Kp * error + Ki * sum_error + Kd * (error - pre_error) / dt;
 
-		pre_error = error;
-		
-		if((pitch > 50) || (pitch < -50)) motor_power = 0;
-		if((roll > 50) || (roll < -50)) motor_power = 0;
-		
-		if(motor_power >= 0){
+			pre_error = error;
 			
-			PORTB |= 1 << 1;
-			PORTB &= ~(1 << 2);
+			cur_sign = motor_power > 0 ? +1 : -1;
 			
-			duty_cycle = motor_power;
-			if(duty_cycle > 100) duty_cycle = 100;
-			PWM_SetDutyCycle(0, duty_cycle);
+			if(motor_power > 0){
+				PORTB |= 1 << 1;
+				PORTB &= ~(1 << 2);
+				duty_cycle = +motor_power;
+			}
+			else{
+				PORTB &= ~(1 << 1);
+				PORTB |= 1 << 2;
+				duty_cycle = -motor_power;
+			}
+			
+			duty_cycle += 10;
+			
+			if((cur_sign != lst_sign) && (duty_cycle < 25)){
+				PWM_SetDutyCycle(25);
+				_delay_ms(20);
+				PWM_SetDutyCycle(duty_cycle);
+				lst_sign = cur_sign;
+			}
+			else{
+				PWM_SetDutyCycle(duty_cycle);
+			}
 		}
-		else{	
-			
-			PORTB &= ~(1 << 1);
-			PORTB |= 1 << 2;
-			
-			duty_cycle = -motor_power;
-			if(duty_cycle > 100) duty_cycle = 100;
-			PWM_SetDutyCycle(0, duty_cycle);
-		}
-		
-		
 		
 		//............................................................................//
 		
@@ -447,14 +495,10 @@ int main()
 		
 		double k[3] = {Kp, Ki, Kd};		
 		for(uint8_t i = 0; i < 3; i++){
-			dtostrf(k[i], 3, 2, double_);
+			dtostrf(k[i], 4, 3, double_);
 			sprintf(buffer, "%s/", double_);
 			USART_SendString(buffer);
 		}
-		
-		dtostrf(error, 3, 2, double_);
-		sprintf(buffer, "%s/", double_);
-		USART_SendString(buffer);
 		
 		dtostrf(sum_error, 3, 2, double_);
 		sprintf(buffer, "%s/", double_);
@@ -468,7 +512,7 @@ int main()
 		sprintf(buffer, "%s/", double_);
 		USART_SendString(buffer);
 		
-		dtostrf(dt, 3, 2, double_);
+		dtostrf(dt, 4, 3, double_);
 		sprintf(buffer, "%s\n", double_);
 		USART_SendString(buffer);	
 	}
