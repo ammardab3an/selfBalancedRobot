@@ -62,8 +62,8 @@ void PWM_SetDutyCycle(double dutyCycle)
 		r_val = dutyCycle;
 	}
 	
-	if(l_val > 255) l_val = 200;
-	if(r_val > 255) r_val = 200;
+	if(l_val > 200) l_val = 200;
+	if(r_val > 200) r_val = 200;
 	
 	OCR0 = (uint8_t) l_val;
 	OCR2 = (uint8_t) r_val;
@@ -396,7 +396,7 @@ int main()
 	PWM_Start();
 	
 	Gyro_Init();
-	timer_setup();
+	//timer_setup();
 	calculate_IMU_error();
 	
 	char buffer[20], double_[10];	
@@ -404,8 +404,8 @@ int main()
 	while(1)
 	{
 		Read_RawValue();
-		get_time_sec(&dt);
-		//dt=0.03;
+		//get_time_sec(&dt);
+		dt=0.03;
 		
 		// Calculating Roll and Pitch from the accelerometer data
 		accAngleX = (atan(Acc_y / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorX;
@@ -472,7 +472,7 @@ int main()
 			
 			duty_cycle += 10;
 			
-			if((cur_sign != lst_sign) && (duty_cycle < 25)){
+			if(0 && (cur_sign != lst_sign) && (duty_cycle < 25)){
 				PWM_SetDutyCycle(25);
 				_delay_ms(20);
 				PWM_SetDutyCycle(duty_cycle);
