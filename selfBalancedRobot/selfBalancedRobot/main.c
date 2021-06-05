@@ -22,7 +22,7 @@ double roll,pitch;
 double error, sum_error, pre_error, motor_power, duty_cycle;
 double target = 0.0;
 double Kp, Ki, Kd;
-uint8_t cur_sign, lst_sign = 0;
+uint8_t go_flag;
 
 void PWM_Init();
 void PWM_SetDutyCycle(double dutyCycle);
@@ -62,8 +62,8 @@ void PWM_SetDutyCycle(double dutyCycle)
 		r_val = dutyCycle;
 	}
 	
-	if(l_val > 200) l_val = 200;
-	if(r_val > 200) r_val = 200;
+	if(l_val > 255) l_val = 255;
+	if(r_val > 255) r_val = 255;
 	
 	OCR0 = (uint8_t) l_val;
 	OCR2 = (uint8_t) r_val;
@@ -355,7 +355,8 @@ void timer_setup(){
 void get_time_sec(double* dt){
 	uint8_t sreg = SREG;
 	cli();
-	*dt = (double)TCNT1*5e-7 + count*0.032768; // step time = (prescaler=8) * 1.0/(f_cpu=16m), count = (max timer value=0xffff)) * (step time)
+	double cur = TCNT1;
+	*dt = (5e-7) * cur + (0.0327675) * count; // step time = (prescaler=8) * 1.0/(f_cpu=16m), count = (max timer value=0xffff)) * (step time)
 	count = TCNT1 = 0; // don't forget to reset tcnt1 also, because we used its value in out calculation.
 	SREG = sreg;
 }
@@ -366,7 +367,7 @@ SIGNAL(TIMER1_OVF_vect){
 
 void ADC_Init()
  {
-	ADCSRA = (1<<ADEN) | (1<<ADPS0) | (1 << ADPS0) | (1 << ADPS1) | (1 << ADPS2); /* Enable ADC , sampling freq=osc_freq/128 */
+	ADCSRA = (1<<ADEN) | (1<<ADPS0) | (1 << ADPS1) | (1 << ADPS2); /* Enable ADC , sampling freq=osc_freq/128 */
 	ADMUX = 0x00;                    /* Result right justified, select channel zero */
  }
 
@@ -384,9 +385,8 @@ uint16_t ADC_GetAdcValue(uint8_t v_adcChannel_u8)
  
 int main()
 {
-	
 	DDRB = 0xff;
-	
+
 	ADC_Init();
 	I2C_Init();
 	USART_Init(19200);
@@ -405,22 +405,19 @@ int main()
 	{
 		Read_RawValue();
 		//get_time_sec(&dt);
-		dt=0.03;
+		dt=0.0465;
 		
 		// Calculating Roll and Pitch from the accelerometer data
 		accAngleX = (atan(Acc_y / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorX;
 		accAngleY = (atan(-1 * Acc_x / sqrt(pow(Acc_y, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorY;
-		accAngleZ = (atan(Acc_z / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorZ;
 		
 		// Correct the outputs with the calculated error values
 		Gyro_x = Gyro_x - GyroErrorX;
 		Gyro_y = Gyro_y - GyroErrorY;
-		Gyro_z = Gyro_z - GyroErrorZ;
-
+		
 		// Currently the raw values are in degrees per seconds, deg/s, so we need to multiply by sendonds (s) to get the angle in degrees
 		gyroAngleX = gyroAngleX + Gyro_x * dt; // deg/s * s = deg
 		gyroAngleY = gyroAngleY + Gyro_y * dt;
-		gyroAngleZ = gyroAngleZ + Gyro_z * dt;
 		
 		// Complementary filter - combine acceleromter and gyro angle values
 		gyroAngleX = 0.96 * gyroAngleX + 0.04 * accAngleX;
@@ -438,9 +435,14 @@ int main()
 		Ki = (double) adc[1] * (0.5 / 1024.0);
 		Kd = (double) adc[2] * (0.3 / 1024.0);
 		
+		Ki = 0;
+		pitch += 75.2; //adc[1] * (100.0 / 1024.0);
+		
 		error = pitch - target;
 		
-		if((pitch > 50) || (pitch < -50) || (roll > 50) || (roll < -50)){
+		go_flag |= (-10 < error) && (error < 10);
+		
+		if(!go_flag || (pitch > 50) || (pitch < -50) || (roll > 50) || (roll < -50)){
 			PWM_SetDutyCycle(0);
 		}
 		else{
@@ -449,15 +451,13 @@ int main()
 			
 			double mx_val = 300;
 			if(sum_error > mx_val)
-			sum_error = mx_val;
+				sum_error = mx_val;
 			if(sum_error < -mx_val)
-			sum_error = -mx_val;
+				sum_error = -mx_val;
 			
 			motor_power = Kp * error + Ki * sum_error + Kd * (error - pre_error) / dt;
 
 			pre_error = error;
-			
-			cur_sign = motor_power > 0 ? +1 : -1;
 			
 			if(motor_power > 0){
 				PORTB |= 1 << 1;
@@ -472,48 +472,26 @@ int main()
 			
 			duty_cycle += 10;
 			
-			if(0 && (cur_sign != lst_sign) && (duty_cycle < 25)){
-				PWM_SetDutyCycle(25);
-				_delay_ms(20);
-				PWM_SetDutyCycle(duty_cycle);
-				lst_sign = cur_sign;
-			}
-			else{
-				PWM_SetDutyCycle(duty_cycle);
-			}
+			PWM_SetDutyCycle(duty_cycle);
 		}
 		
 		//............................................................................//
 		
-		dtostrf(roll, 3, 2, double_);
-		sprintf(buffer, "%s/", double_);
-		USART_SendString(buffer);
+		double tmp[] = {
+			roll, pitch,
+			Kp, Ki, Kd,
+			sum_error, motor_power, duty_cycle,
+			gyroAngleX, gyroAngleY, accAngleX, accAngleY,
+			(double)go_flag, dt
+		};
 		
-		dtostrf(pitch, 3, 2, double_);
-		sprintf(buffer, "%s/", double_);
-		USART_SendString(buffer);
+		int tmp_sz = sizeof(tmp) / sizeof(tmp[0]);
 		
-		double k[3] = {Kp, Ki, Kd};		
-		for(uint8_t i = 0; i < 3; i++){
-			dtostrf(k[i], 4, 3, double_);
+		for(int i = 0; i < tmp_sz; i++){
+			dtostrf(tmp[i], 3, 2, double_);
 			sprintf(buffer, "%s/", double_);
 			USART_SendString(buffer);
 		}
-		
-		dtostrf(sum_error, 3, 2, double_);
-		sprintf(buffer, "%s/", double_);
-		USART_SendString(buffer);
-		
-		dtostrf(motor_power, 3, 2, double_);
-		sprintf(buffer, "%s/", double_);
-		USART_SendString(buffer);
-		
-		dtostrf(duty_cycle, 3, 2, double_);
-		sprintf(buffer, "%s/", double_);
-		USART_SendString(buffer);
-		
-		dtostrf(dt, 4, 3, double_);
-		sprintf(buffer, "%s\n", double_);
-		USART_SendString(buffer);	
+		USART_SendString("\n");
 	}
 }
