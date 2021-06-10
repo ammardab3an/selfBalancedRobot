@@ -52,15 +52,8 @@ void PWM_SetDutyCycle(double dutyCycle)
 	
 	double l_val, r_val;
 	
-	if(motor_power > 0){
-		l_val = 1.08 * dutyCycle;
-		r_val = dutyCycle;
-		
-	}
-	else{
-		l_val = 1.08 * dutyCycle;
-		r_val = dutyCycle;
-	}
+	l_val = 1.08 * dutyCycle;
+	r_val = dutyCycle;
 	
 	if(l_val > 255) l_val = 255;
 	if(r_val > 255) r_val = 255;
@@ -356,7 +349,7 @@ void get_time_sec(double* dt){
 	uint8_t sreg = SREG;
 	cli();
 	double cur = TCNT1;
-	*dt = (5e-7) * cur + (0.0327675) * count; // step time = (prescaler=8) * 1.0/(f_cpu=16m), count = (max timer value=0xffff)) * (step time)
+	*dt = (5e-7) * cur + (0.032768) * count; // step time = (prescaler=8) * 1.0/(f_cpu=16m), count = (max timer value=0xffff)) * (step time)
 	count = TCNT1 = 0; // don't forget to reset tcnt1 also, because we used its value in out calculation.
 	SREG = sreg;
 }
@@ -426,17 +419,16 @@ int main()
 		roll = gyroAngleX;
 		pitch = gyroAngleY;
 		
-		uint16_t adc[3];
-		for(int i = 0; i < 3; i++){
+		uint16_t adc[4];
+		for(int i = 0; i < 4; i++){
 			adc[i] = ADC_GetAdcValue(i);
 		}
 		
 		Kp = (double) adc[0] * (10.0 / 1024.0);
-		Ki = (double) adc[1] * (0.5 / 1024.0);
+		Ki = (double) adc[1] * (2.0 / 1024.0);
 		Kd = (double) adc[2] * (0.3 / 1024.0);
 		
-		Ki = 0;
-		pitch += 75.2; //adc[1] * (100.0 / 1024.0);
+		pitch += 70 + adc[3] * (15.0 / 1024.0);
 		
 		error = pitch - target;
 		
@@ -482,7 +474,7 @@ int main()
 			Kp, Ki, Kd,
 			sum_error, motor_power, duty_cycle,
 			gyroAngleX, gyroAngleY, accAngleX, accAngleY,
-			(double)go_flag, dt
+			go_flag, dt
 		};
 		
 		int tmp_sz = sizeof(tmp) / sizeof(tmp[0]);
