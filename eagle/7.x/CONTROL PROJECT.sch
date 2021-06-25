@@ -18889,14 +18889,14 @@ general purpose rectifier, 1 A</description>
 <label x="157.48" y="68.58" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$1" class="0">
+<net name="SCL" class="0">
 <segment>
 <pinref part="IC1" gate="G$1" pin="(SCL)PC0"/>
 <wire x1="-33.02" y1="25.4" x2="20.32" y2="25.4" width="0.1524" layer="91"/>
 <pinref part="MPU6050" gate="A" pin="6"/>
 </segment>
 </net>
-<net name="N$13" class="0">
+<net name="SDA" class="0">
 <segment>
 <pinref part="IC1" gate="G$1" pin="(SDA)PC1"/>
 <wire x1="-33.02" y1="27.94" x2="20.32" y2="27.94" width="0.1524" layer="91"/>
@@ -18927,7 +18927,7 @@ general purpose rectifier, 1 A</description>
 <wire x1="-187.96" y1="88.9" x2="-193.04" y2="88.9" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="N$18" class="0">
+<net name="SCK" class="0">
 <segment>
 <pinref part="IC1" gate="G$1" pin="(SCK)PB7"/>
 <wire x1="-33.02" y1="66.04" x2="-15.24" y2="66.04" width="0.1524" layer="91"/>
@@ -18940,8 +18940,8 @@ general purpose rectifier, 1 A</description>
 <segment>
 <pinref part="IC1" gate="G$1" pin="(AIN1/OC0)PB3"/>
 <pinref part="L298N" gate="A" pin="1"/>
-<wire x1="-33.02" y1="55.88" x2="-5.08" y2="48.26" width="0.1524" layer="91"/>
-<wire x1="-5.08" y1="48.26" x2="-5.08" y2="-7.62" width="0.1524" layer="91"/>
+<wire x1="-33.02" y1="55.88" x2="-7.62" y2="55.88" width="0.1524" layer="91"/>
+<wire x1="-7.62" y1="55.88" x2="-5.08" y2="-7.62" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="OC2" class="0">

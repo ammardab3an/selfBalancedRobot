@@ -12,7 +12,7 @@
 #include <avr/io.h>								/* Include AVR std. library file */
 #include <util/delay.h>							/* Include delay header file */
 #include <math.h>								/* Include math function */
-#define SCL_CLK 100000L							/* Define SCL clock frequency */
+#define SCL_CLK 200000L							/* Define SCL clock frequency */
 #define BITRATE(TWSR)	((F_CPU/SCL_CLK)-16)/(2*pow(4,(TWSR&((1<<TWPS0)|(1<<TWPS1))))) /* Define bit rate */
 
 void I2C_Init();								/* I2C initialize function */

@@ -3,7 +3,7 @@
 <eagle version="9.6.2">
 <drawing>
 <settings>
-<setting alwaysvectorfont="no"/>
+<setting alwaysvectorfont="yes"/>
 <setting keepoldvectorfont="yes"/>
 <setting verticaltext="up"/>
 </settings>
@@ -3342,10 +3342,14 @@ design rules under a new name.</description>
 <wire x1="53.34" y1="59.69" x2="60.96" y2="59.69" width="1.016" layer="16"/>
 <wire x1="51.308" y1="57.658" x2="53.34" y2="59.69" width="1.016" layer="16"/>
 <polygon width="1.016" layer="16" isolate="0.6096" thermals="no">
-<vertex x="2.54" y="64.77"/>
-<vertex x="116.332" y="64.77"/>
-<vertex x="116.332" y="-6.477"/>
-<vertex x="2.54" y="-6.477"/>
+<vertex x="2.54" y="65.405"/>
+<vertex x="123.952" y="65.405"/>
+<vertex x="125.095" y="64.262"/>
+<vertex x="125.095" y="-10.16"/>
+<vertex x="4.953" y="-10.16"/>
+<vertex x="3.81" y="-9.017"/>
+<vertex x="3.175" y="-8.382"/>
+<vertex x="2.54" y="-7.747"/>
 </polygon>
 </signal>
 <signal name="N$2">
