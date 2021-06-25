@@ -14,7 +14,7 @@
 
 #define RAD_TO_DEG 57.29577951308232
 
-double dt, count;	
+double dt, count;
 double Acc_x, Acc_y, Acc_z, Gyro_x, Gyro_y, Gyro_z, Temperature;
 double accAngleX, accAngleY, accAngleZ, gyroAngleX, gyroAngleY, gyroAngleZ;
 double AccErrorX, AccErrorY, AccErrorZ, GyroErrorX, GyroErrorY, GyroErrorZ;
@@ -32,7 +32,7 @@ void MPU_Start_Loc();
 void Read_RawValue();
 void calculate_IMU_error(void);
 void timer_setup();
-void get_time_sec(double* dt);
+void get_time_sec();
 SIGNAL(TIMER1_OVF_vect);
 void ADC_Init();
 uint16_t ADC_GetAdcValue(uint8_t v_adcChannel_u8);
@@ -53,7 +53,7 @@ void Gyro_Init()		 									/* Gyro initialization function */
 
 	I2C_Start_Wait(0xD0);
 	I2C_Write(CONFIG);									/* Write to Configuration register */
-	I2C_Write(0x03);									/* acc_bandwidth = 44, gyro_bandwidth = 42, Fs = 1KHz */
+	I2C_Write(0x04);									/* acc_bandwidth = 44, gyro_bandwidth = 42, Fs = 1KHz */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
@@ -252,6 +252,7 @@ void Gyro_Init()		 									/* Gyro initialization function */
 	I2C_Stop();
 }
 
+
 void MPU_Start_Loc()
 {
 	I2C_Start_Wait(0xD0);								/* I2C start with device write address */
@@ -286,14 +287,15 @@ void calculate_IMU_error(void) {
 	while (c < 200) {
 		
 		Read_RawValue();
+		get_time_sec();
 		
 		AccErrorX = AccErrorX + ((atan((Acc_y) / sqrt(pow((Acc_x), 2) + pow((Acc_z), 2))) * RAD_TO_DEG));
 		AccErrorY = AccErrorY + ((atan(-1 * (Acc_x) / sqrt(pow((Acc_y), 2) + pow((Acc_z), 2))) * RAD_TO_DEG));
 		AccErrorZ = AccErrorZ + ((atan((Acc_z) / sqrt(pow((Acc_x), 2) + pow((Acc_z), 2))) * RAD_TO_DEG));
 
-		GyroErrorX = GyroErrorX + Gyro_x;
-		GyroErrorY = GyroErrorY + Gyro_y;
-		GyroErrorZ = GyroErrorZ + Gyro_z;
+		GyroErrorX = GyroErrorX + Gyro_x * dt;
+		GyroErrorY = GyroErrorY + Gyro_y * dt;
+		GyroErrorZ = GyroErrorZ + Gyro_z * dt;
 		
 		c++;
 	}
@@ -309,14 +311,14 @@ void calculate_IMU_error(void) {
 
 void timer_setup(){
 	TCCR1A = 0x00;
-	TIMSK |= _BV(TOIE1);
-	TCCR1B |= _BV(CS11);
-	TCCR1B &= ~(_BV(CS12)  | _BV(CS10)); // prescaler=8
+	TIMSK |= 1 << TOIE1;
+	TCCR1B |= 1 << CS11;
+	TCCR1B &= ~((1 << CS12) | (1 << CS10)); // prescaler = 8
 }
 
-void get_time_sec(double* dt){
+void get_time_sec(){
 	double cur = TCNT1;
-	*dt = (5e-7) * cur + (0.032768) * count; // step time = (prescaler=8) * 1.0/(f_cpu=16m), count = (max timer value=0xffff)) * (step time)
+	dt = (5e-7) * cur + (0.032768) * count; // step time = (prescaler=8) * 1.0/(f_cpu=16m), count = (max timer value=0xffff)) * (step time)
 	count = TCNT1 = 0; // don't forget to reset tcnt1 also, because we used its value in out calculation.
 }
 
@@ -356,49 +358,50 @@ void PWM_SetDutyCycle(double dutyCycle)
 }
 
 void ADC_Init()
- {
-	ADCSRA = (1 << ADEN) | (1 << ADPS1) | (1 << ADPS2); /* Enable ADC , sampling freq=osc_freq/64 */
+{
+	ADCSRA = (1 << ADEN) | (1 << ADPS1) | (1 << ADPS2); /* Enable ADC , sampling freq=osc_freq/64 = 250k hz*/
 	ADMUX = (1 << REFS0);                    /* Result right justified, select channel zero */
- }
+}
 
 uint16_t ADC_GetAdcValue(uint8_t v_adcChannel_u8)
- {
-   
-	ADMUX = (1 << REFS0) | v_adcChannel_u8;               /* Select the required channel */
-	_delay_us(10);                         /* Wait for some time for the channel to get selected */
-	ADCSRA |= 1 << ADSC;                   /* Start the ADC conversion by setting ADSC bit */
-   
-	while((ADCSRA & (1 << ADIF)) == 0);    /* Wait till the conversion is over */
-                                           /* ADIF will be set once ADC conversion is complete */
-	return(ADCW);                          /* Return the 10-bit result */
- }
- 
+{
+	
+	ADMUX = (1 << REFS0) | v_adcChannel_u8;   /* Select the required channel */
+	_delay_us(10);                            /* Wait for some time for the channel to get selected */
+	ADCSRA |= 1 << ADSC;                      /* Start the ADC conversion by setting ADSC bit */
+	
+	while((ADCSRA & (1 << ADIF)) == 0);       /* Wait till the conversion is over */
+	/* ADIF will be set once ADC conversion is complete */
+	return(ADCW);                             /* Return the 10-bit result */
+}
+
 int main()
-{	
+{
 	
 	DDRB |= (1<<PB0) | (1<<PB1);
 	DDRD |= (1<<PD5) | (1<<PD6);
 	
-	ADC_Init();
 	I2C_Init();
 	USART_Init(57600);
+	
+	timer_setup();
+	sei();
+	
+	Gyro_Init();
+	calculate_IMU_error();
 
+	ADC_Init();
+	
 	PWM_Init();
 	PWM_SetDutyCycle(0);
 	PWM_Start();
 	
-	Gyro_Init();
-	timer_setup();
-	calculate_IMU_error();
-	
-	char buffer[20], double_[10];	
-	
-	sei();
+	char buffer[20], _double[10];
 	
 	while(1)
 	{
 		Read_RawValue();
-		get_time_sec(&dt);
+		get_time_sec();
 		
 		// Calculating Roll and Pitch from the accelerometer data
 		accAngleX = (atan(Acc_y / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorX;
@@ -425,7 +428,7 @@ int main()
 		}
 		
 		Kp = (double) adc[1] * (10.0 / 1024.0);
-		Ki = (double) adc[2] * (2.0 / 1024.0);
+		Ki = (double) adc[2] * (4.0 / 1024.0);
 		Kd = (double) adc[3] * (0.3 / 1024.0);
 		
 		pitch += (double) 65 + adc[0] * (15.0 / 1024.0);
@@ -443,14 +446,14 @@ int main()
 			
 			PORTB |= (1<<PB0);
 			PORTB &= ~(1<<PB1);
-				
+			
 			sum_error += error * dt;
 			
-			double mx_val = 300;
+			double mx_val = 50;
 			if(sum_error > mx_val)
-				sum_error = mx_val;
+			sum_error = mx_val;
 			if(sum_error < -mx_val)
-				sum_error = -mx_val;
+			sum_error = -mx_val;
 			
 			motor_power = Kp * error + Ki * sum_error + Kd * (error - pre_error) / dt;
 
@@ -467,27 +470,36 @@ int main()
 				duty_cycle = -motor_power;
 			}
 			
-			PWM_SetDutyCycle(duty_cycle + 10);
+			PWM_SetDutyCycle(duty_cycle);
 		}
 		
 		//............................................................................//
 		
-		double tmp[] = {
-			pitch,
-			Kp, Ki, Kd,
-			sum_error, motor_power, duty_cycle,
-			gyroAngleX, gyroAngleY, accAngleX, accAngleY,
-			dt
-		};
+		usart_pre += 1;
+		usart_pre %= 20;
 		
-		int tmp_sz = sizeof(tmp) / sizeof(tmp[0]);
-		
-		for(int i = 0; i < tmp_sz; i++){
-			dtostrf(tmp[i], 3, 3, double_);
-			sprintf(buffer, "%s/", double_);
-			USART_SendString(buffer);
+		if(usart_pre == 0){
+			
+			double tmp[] = {
+				pitch,
+				Kp, Ki, Kd,
+				sum_error, motor_power, duty_cycle,
+				dt
+			};
+			
+			int tmp_sz = sizeof(tmp) / sizeof(tmp[0]);
+			
+			for(int i = 0; i < tmp_sz; i++){
+				dtostrf(tmp[i], 3, 3, _double);
+				sprintf(buffer, "%s/", _double);
+				USART_SendString(buffer);
+			}
+			USART_SendString("\n");
+			
 		}
-		USART_SendString("\n");	
+		else{
+			_delay_ms(2);
+		}
 		
 	}
 }
