@@ -2078,8 +2078,8 @@ Disassembly of section .text:
     1582:	90 e0       	ldi	r25, 0x00	; 0
     1584:	0e 94 f3 0a 	call	0x15e6	; 0x15e6 <USART_SendString>
     1588:	68 cc       	rjmp	.-1840   	; 0xe5a <main+0x64>
-    158a:	ef e3       	ldi	r30, 0x3F	; 63
-    158c:	ff e1       	ldi	r31, 0x1F	; 31
+    158a:	ef ed       	ldi	r30, 0xDF	; 223
+    158c:	fe e2       	ldi	r31, 0x2E	; 46
     158e:	31 97       	sbiw	r30, 0x01	; 1
     1590:	f1 f7       	brne	.-4      	; 0x158e <main+0x798>
     1592:	00 c0       	rjmp	.+0      	; 0x1594 <main+0x79e>
