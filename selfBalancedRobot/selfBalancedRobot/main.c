@@ -3,7 +3,6 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/eeprom.h>
 #include <util/delay.h>
 #include <inttypes.h>
 #include <stdlib.h>
@@ -37,217 +36,217 @@ SIGNAL(TIMER1_OVF_vect);
 void ADC_Init();
 uint16_t ADC_GetAdcValue(uint8_t v_adcChannel_u8);
 
-void Gyro_Init()		 									/* Gyro initialization function */
+void Gyro_Init()
 {
-	_delay_ms(150);										/* Power up time >100ms */
+	_delay_ms(150); 	    /* Power up time >100ms */
 	
-	I2C_Start_Wait(0xD0);								/* Start with device write address */
-	I2C_Write(SMPLRT_DIV);								/* Write to sample rate register */
-	I2C_Write(0x07);									/* 1KHz sample rate */
+	I2C_Start_Wait(0xD0); 	/* Start with device write address */
+	I2C_Write(SMPLRT_DIV); 	/* Write to sample rate register */
+	I2C_Write(0x07); 		/* 8k/(7+1) = 1KHz sample rate */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(PWR_MGMT_1);								/* Write to power management register */
-	I2C_Write(0x01);									/* X axis gyroscope reference frequency */
+	I2C_Write(PWR_MGMT_1); 	/* Write to power management register */
+	I2C_Write(0x01); 		/* X axis gyroscope reference frequency */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(CONFIG);									/* Write to Configuration register */
-	I2C_Write(0x04);									/* acc_bandwidth = 44, gyro_bandwidth = 42, Fs = 1KHz */
+	I2C_Write(CONFIG); 		/* Write to Configuration register */
+	I2C_Write(0x02); 		/* acc_bandwidth = 94, gyro_bandwidth = 98, Fs = 1KHz, dealy_gyro = 3ms, delay_acc = 2.8ms*/
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(GYRO_CONFIG);
+	I2C_Write(GYRO_CONFIG); /* full scal range ± 2000 °/s */
 	I2C_Write(0x18);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(ACCEL_CONFIG);							/* Write to Accelo configuration register */
-	I2C_Write(0x00);									/* Full scale range +/- 2g */
+	I2C_Write(ACCEL_CONFIG); /* Write to Accelo configuration register */
+	I2C_Write(0x00); 		 /* Full scale range +/- 2g */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(MOT_THR);									/* Write to motion threshold register */
-	I2C_Write(0x00);									/* Motion detection threshold value */
+	I2C_Write(MOT_THR); 	 /* Write to motion threshold register */
+	I2C_Write(0x00); 		 /* Motion detection threshold value */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(FIFO_EN);									/* Write to FIFO enable register */
-	I2C_Write(0x00);									/* FIFO disabled */
+	I2C_Write(FIFO_EN); 	 /* Write to FIFO enable register */
+	I2C_Write(0x00); 		 /* FIFO disabled */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(FF_THR);									/* Write to free fall threshold register */
-	I2C_Write(0x00);									/* Free fall threshold value */
+	I2C_Write(FF_THR); 		/* Write to free fall threshold register */
+	I2C_Write(0x00); 		/* Free fall threshold value */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(FF_DUR);									/* Write to free fall duration register */
-	I2C_Write(0x00);									/* Free fall duration counter */
+	I2C_Write(FF_DUR); 		/* Write to free fall duration register */
+	I2C_Write(0x00); 		/* Free fall duration counter */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(MOT_DUR);									/* Write to motion duration register */
-	I2C_Write(0x00);									/* Motion detection duration counter */
+	I2C_Write(MOT_DUR); 	/* Write to motion duration register */
+	I2C_Write(0x00); 		/* Motion detection duration counter */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(ZRMOT_DUR);								/* Write to zero motion duration register */
-	I2C_Write(0x00);									/* Zero motion detection duration counter */
+	I2C_Write(ZRMOT_DUR); 	/* Write to zero motion duration register */
+	I2C_Write(0x00); 		/* Zero motion detection duration counter */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(ZRMOT_THR);								/* Write to zero motion threshold register */
-	I2C_Write(0x00);									/* Zero motion detection threshold value */
+	I2C_Write(ZRMOT_THR); 	/* Write to zero motion threshold register */
+	I2C_Write(0x00); 		/* Zero motion detection threshold value */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_MST_CTRL);							/* Write to I2C Master control register */
-	I2C_Write(0x00);									/* Disable multi-master */
+	I2C_Write(I2C_MST_CTRL); /* Write to I2C Master control register */
+	I2C_Write(0x00); 		 /* Disable multi-master */
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV0_REG);							/* Write to I2C Slave0 data register */
+	I2C_Write(I2C_SLV0_REG);  /* Write to I2C Slave0 data register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV0_ADDR);							/* Write to I2C Slave0 address register */
+	I2C_Write(I2C_SLV0_ADDR); /* Write to I2C Slave0 address register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV0_CTRL);							/* Write to I2C Slave0 Control register */
+	I2C_Write(I2C_SLV0_CTRL); /* Write to I2C Slave0 Control register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV1_REG);							/* Write to I2C Slave1 data register */
+	I2C_Write(I2C_SLV1_REG); /* Write to I2C Slave1 data register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV1_ADDR);							/* Write to I2C Slave1 address register */
+	I2C_Write(I2C_SLV1_ADDR); /* Write to I2C Slave1 address register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV1_CTRL);							/* Write to I2C Slave1 control register */
+	I2C_Write(I2C_SLV1_CTRL); /* Write to I2C Slave1 control register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV2_REG);							/* Write to I2C Slave2 data register */
+	I2C_Write(I2C_SLV2_REG); /* Write to I2C Slave2 data register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV2_REG);							/* Write to I2C Slave2 address register */
+	I2C_Write(I2C_SLV2_REG); /* Write to I2C Slave2 address register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV2_CTRL);							/* Write to I2C Slave2 control register */
+	I2C_Write(I2C_SLV2_CTRL); /* Write to I2C Slave2 control register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV3_REG);							/* Write to I2C Slave3 data register */
+	I2C_Write(I2C_SLV3_REG); /* Write to I2C Slave3 data register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV3_ADDR);							/* Write to I2C Slave3 address register */
+	I2C_Write(I2C_SLV3_ADDR); /* Write to I2C Slave3 address register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV3_CTRL);							/* Write to I2C Slave3 control register */
+	I2C_Write(I2C_SLV3_CTRL); /* Write to I2C Slave3 control register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV4_REG);							/* Write to I2C Slave4 data register */
+	I2C_Write(I2C_SLV4_REG); /* Write to I2C Slave4 data register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV4_ADDR);							/* Write to I2C Slave4 address register */
+	I2C_Write(I2C_SLV4_ADDR); /* Write to I2C Slave4 address register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV4_CTRL);							/* Write to I2C Slave4 control register */
+	I2C_Write(I2C_SLV4_CTRL); /* Write to I2C Slave4 control register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV4_DO);								/* Write to I2C Slave4 data out register */
+	I2C_Write(I2C_SLV4_DO);   /* Write to I2C Slave4 data out register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV4_DI);								/* Write to I2C Slave4 data in register */
+	I2C_Write(I2C_SLV4_DI);   /* Write to I2C Slave4 data in register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(INT_PIN_CFG);								/* Write to interrupt pin configuration register */
+	I2C_Write(INT_PIN_CFG);   /* Write to interrupt pin configuration register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(INT_ENABLE);								/* Write to interrupt enable register */
+	I2C_Write(INT_ENABLE); 	/* Write to interrupt enable register */
 	I2C_Write(0x01);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV0_DO);								/* Write to I2C Slave0 data out register */
+	I2C_Write(I2C_SLV0_DO); 	/* Write to I2C Slave0 data out register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV1_DO);								/* Write to I2C Slave1 data out register */
+	I2C_Write(I2C_SLV1_DO); 	/* Write to I2C Slave1 data out register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV2_DO);								/* Write to I2C Slave2 data out register */
+	I2C_Write(I2C_SLV2_DO); 	/* Write to I2C Slave2 data out register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_SLV3_DO);								/* Write to I2C Slave3 data out register */
+	I2C_Write(I2C_SLV3_DO); 	/* Write to I2C Slave3 data out register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(I2C_MST_DELAY_CTRL);						/* Write to I2C Master delay control register */
+	I2C_Write(I2C_MST_DELAY_CTRL);	/* Write to I2C Master delay control register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(SIGNAL_PATH_RESET);						/* Write to Signal Path Reset register */
+	I2C_Write(SIGNAL_PATH_RESET);	/* Write to Signal Path Reset register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(MOT_DETECT_CTRL);							/* Write to Motion detection control register */
+	I2C_Write(MOT_DETECT_CTRL); /* Write to Motion detection control register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(USER_CTRL);								/* Write to User control register */
+	I2C_Write(USER_CTRL); 	/* Write to User control register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(PWR_MGMT_2);								/* Write to power management register */
+	I2C_Write(PWR_MGMT_2); 	/* Write to power management register */
 	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(FIFO_R_W);								/* Write to FIFO R/W register */
+	I2C_Write(FIFO_R_W); 	/* Write to FIFO R/W register */
 	I2C_Write(0x00);
 	I2C_Stop();
 }
@@ -255,14 +254,14 @@ void Gyro_Init()		 									/* Gyro initialization function */
 
 void MPU_Start_Loc()
 {
-	I2C_Start_Wait(0xD0);								/* I2C start with device write address */
-	I2C_Write(ACCEL_XOUT_H);							/* Write start location address from where to read */
-	I2C_Repeated_Start(0xD1);							/* I2C start with device read address */
+	I2C_Start_Wait(0xD0); 	  /* I2C start with device write address */
+	I2C_Write(ACCEL_XOUT_H);  /* Write start location address from where to read */
+	I2C_Repeated_Start(0xD1); /* I2C start with device read address */
 }
 
 void Read_RawValue()  //read the raw values of the sensor
 {
-	MPU_Start_Loc();									/* Read Gyro values */
+	MPU_Start_Loc();
 	Acc_x = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
 	Acc_y = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
 	Acc_z = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Ack());
@@ -272,7 +271,8 @@ void Read_RawValue()  //read the raw values of the sensor
 	Gyro_z = (((int)I2C_Read_Ack()<<8) | (int)I2C_Read_Nack());
 	I2C_Stop();
 	
-	Acc_x = Acc_x/16384.0;	//Xa						/* Divide raw value by sensitivity scale factor to get real values */
+	/* Divide raw value by sensitivity scale factor to get real values */
+	Acc_x = Acc_x/16384.0;	//Xa
 	Acc_y = Acc_y/16384.0;	//Ya
 	Acc_z = Acc_z/16384.0;	//Za
 	
@@ -293,7 +293,7 @@ void calculate_IMU_error(void) {
 		AccErrorY = AccErrorY + ((atan(-1 * (Acc_x) / sqrt(pow((Acc_y), 2) + pow((Acc_z), 2))) * RAD_TO_DEG));
 		AccErrorZ = AccErrorZ + ((atan((Acc_z) / sqrt(pow((Acc_x), 2) + pow((Acc_z), 2))) * RAD_TO_DEG));
 
-		GyroErrorX = GyroErrorX + Gyro_x * dt;
+		GyroErrorX = GyroErrorX + Gyro_x * dt; // deg/s * s = deg
 		GyroErrorY = GyroErrorY + Gyro_y * dt;
 		GyroErrorZ = GyroErrorZ + Gyro_z * dt;
 		
@@ -318,8 +318,10 @@ void timer_setup(){
 
 void get_time_sec(){
 	double cur = TCNT1;
-	dt = (5e-7) * cur + (0.032768) * count; // step time = (prescaler=8) * 1.0/(f_cpu=16m), count = (max timer value=0xffff)) * (step time)
-	count = TCNT1 = 0; // don't forget to reset tcnt1 also, because we used its value in out calculation.
+	// step time = (prescaler=8) * 1.0/(f_cpu=16m), count = (max timer value=0xffff)) * (step time)
+	dt = (5e-7) * cur + (0.032768) * count; 
+	// don't forget to reset tcnt1 also, because we used its value in our calculation.
+	count = TCNT1 = 0; 
 }
 
 SIGNAL(TIMER1_OVF_vect){
@@ -336,8 +338,8 @@ void PWM_Init()
 
 void PWM_Start()
 {
-	TCCR0 = (1<<WGM00)|(1<<WGM01)|(1<<COM01)|(1<<CS00);
-	TCCR2 = (1<<WGM20)|(1<<WGM21)|(1<<COM21)|(1<<CS20);
+	TCCR0 = (1<<WGM00)|(1<<WGM01)|(1<<COM01)|(1<<CS00); // maximum pwm freq using fast pwm mode without a prescaler
+	TCCR2 = (1<<WGM20)|(1<<WGM21)|(1<<COM21)|(1<<CS20); // 16m / 256 = 62.5khz
 }
 
 void PWM_SetDutyCycle(double dutyCycle)
@@ -359,8 +361,10 @@ void PWM_SetDutyCycle(double dutyCycle)
 
 void ADC_Init()
 {
-	ADCSRA = (1 << ADEN) | (1 << ADPS1) | (1 << ADPS2); /* Enable ADC , sampling freq=osc_freq/64 = 250k hz*/
-	ADMUX = (1 << REFS0);                    /* Result right justified, select channel zero */
+	/* Result right justified, select channel zero */
+	ADMUX = (1 << REFS0);
+	/* Enable ADC , sampling freq=osc_freq/64 = 250khz*/
+	ADCSRA = (1 << ADEN) | (1 << ADPS1) | (1 << ADPS2); 
 }
 
 uint16_t ADC_GetAdcValue(uint8_t v_adcChannel_u8)
@@ -408,14 +412,14 @@ int main()
 		accAngleY = (atan(-1 * Acc_x / sqrt(pow(Acc_y, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorY;
 		
 		// Correct the outputs with the calculated error values
-		Gyro_x = Gyro_x - GyroErrorX;
-		Gyro_y = Gyro_y - GyroErrorY;
 		
-		// Currently the raw values are in degrees per seconds, deg/s, so we need to multiply by sendonds (s) to get the angle in degrees
-		gyroAngleX = gyroAngleX + Gyro_x * dt; // deg/s * s = deg
-		gyroAngleY = gyroAngleY + Gyro_y * dt;
+		Gyro_x = Gyro_x * dt - GyroErrorX; // deg/s * s = deg
+		Gyro_y = Gyro_y * dt - GyroErrorY;
 		
-		// Complementary filter - combine acceleromter and gyro angle values
+		gyroAngleX = gyroAngleX + Gyro_x; 
+		gyroAngleY = gyroAngleY + Gyro_y;
+		
+		// Complementary filter - combine accelerometer and gyro angle values
 		gyroAngleX = 0.96 * gyroAngleX + 0.04 * accAngleX;
 		gyroAngleY = 0.96 * gyroAngleY + 0.04 * accAngleY;
 		
@@ -470,7 +474,7 @@ int main()
 				duty_cycle = -motor_power;
 			}
 			
-			PWM_SetDutyCycle(duty_cycle);
+			PWM_SetDutyCycle(duty_cycle+10);
 		}
 		
 		//............................................................................//
@@ -498,6 +502,7 @@ int main()
 			
 		}
 		else{
+			// added delay to set the sampling frequency
 			_delay_ms(3);
 		}
 		
