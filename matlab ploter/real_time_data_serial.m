@@ -6,7 +6,7 @@ TimeInterval = 0;%time interval between each input.
 loop = 120;%count values
 %%Set up the serial port object
 
-s = serial(SerialPort, 'BaudRate', 19200);
+s = serial(SerialPort, 'BaudRate', 57200);
 fopen(s);
 
 time = now;
@@ -30,7 +30,7 @@ hold on;
 plotHandle = plot(axesHandle,time,voltage,'Marker','.','LineWidth',1,'Color',[0 1 0]);
 
 xlim(axesHandle,[min(time) max(time+0.001)]);
-ylim(axesHandle,[-50, +50]);
+ylim(axesHandle,[-70, +70]);
 
 % Create xlabel
 xlabel('Time','FontWeight','bold','FontSize',14,'Color',[1 1 0]);
@@ -56,11 +56,11 @@ while 1
     
     input_raw = fscanf(s);
     input_raw
-    input = sscanf(input_raw,'%f/%f/%f/%f/%f/%f/%f/%f/%f/%f/%f/%f/%f/%f/');
+    input = sscanf(input_raw,'%f/%f/%f/%f/%f/%f/%f/%f/');
     
     sz = size(input);
     
-    if sz(1) == 14
+    if sz(1) == 8
         voltage(count) = input(2);
         time(count) = count;
         set(plotHandle,'YData',voltage,'XData',time);

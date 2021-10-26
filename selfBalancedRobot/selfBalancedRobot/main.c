@@ -18,7 +18,7 @@ double Acc_x, Acc_y, Acc_z, Gyro_x, Gyro_y, Gyro_z, Temperature;
 double accAngleX, accAngleY, accAngleZ, gyroAngleX, gyroAngleY, gyroAngleZ;
 double AccErrorX, AccErrorY, AccErrorZ, GyroErrorX, GyroErrorY, GyroErrorZ;
 double roll,pitch;
-double error, sum_error, pre_error, motor_power, duty_cycle;
+double error, sum_error, pre_error, motor_power;
 double target = 0.0;
 double Kp, Ki, Kd;
 uint8_t go_flag, usart_pre;
@@ -56,8 +56,8 @@ void Gyro_Init()
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
-	I2C_Write(GYRO_CONFIG); /* full scal range ± 2000 °/s */
-	I2C_Write(0x18);
+	I2C_Write(GYRO_CONFIG); /* full scal range ± 250 °/s */
+	I2C_Write(0x00);
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
@@ -276,9 +276,9 @@ void Read_RawValue()  //read the raw values of the sensor
 	Acc_y = Acc_y/16384.0;	//Ya
 	Acc_z = Acc_z/16384.0;	//Za
 	
-	Gyro_x = Gyro_x/16.4;	//Xg
-	Gyro_y = Gyro_y/16.4;	//Yg
-	Gyro_z = Gyro_z/16.4;	//Zg
+	Gyro_x = Gyro_x/131.0;	//Xg
+	Gyro_y = Gyro_y/131.0;	//Yg
+	Gyro_z = Gyro_z/131.0;	//Zg
 }
 
 void calculate_IMU_error(void) {
@@ -409,15 +409,11 @@ int main()
 		
 		// Calculating Roll and Pitch from the accelerometer data
 		accAngleX = (atan(Acc_y / sqrt(pow(Acc_x, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorX;
-		accAngleY = (atan(-1 * Acc_x / sqrt(pow(Acc_y, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorY;
+		accAngleY = (atan(-1.0 * Acc_x / sqrt(pow(Acc_y, 2) + pow(Acc_z, 2))) * RAD_TO_DEG) - AccErrorY;
 		
 		// Correct the outputs with the calculated error values
-		
-		Gyro_x = Gyro_x * dt - GyroErrorX; // deg/s * s = deg
-		Gyro_y = Gyro_y * dt - GyroErrorY;
-		
-		gyroAngleX = gyroAngleX + Gyro_x; 
-		gyroAngleY = gyroAngleY + Gyro_y;
+		gyroAngleX = gyroAngleX + Gyro_x * dt - GyroErrorX; 
+		gyroAngleY = gyroAngleY + Gyro_y * dt - GyroErrorY;
 		
 		// Complementary filter - combine accelerometer and gyro angle values
 		gyroAngleX = 0.96 * gyroAngleX + 0.04 * accAngleX;
@@ -432,7 +428,7 @@ int main()
 		}
 		
 		Kp = (double) adc[1] * (10.0 / 1024.0);
-		Ki = (double) adc[2] * (4.0 / 1024.0);
+		Ki = (double) adc[2] * (6.0 / 1024.0);
 		Kd = (double) adc[3] * (0.3 / 1024.0);
 		
 		pitch += (double) 65 + adc[0] * (15.0 / 1024.0);
@@ -453,7 +449,7 @@ int main()
 			
 			sum_error += error * dt;
 			
-			double mx_val = 50;
+			double mx_val = 20;
 			if(sum_error > mx_val)
 			sum_error = mx_val;
 			if(sum_error < -mx_val)
@@ -466,28 +462,33 @@ int main()
 			if(motor_power > 0){
 				PORTD |= 1 << 5;
 				PORTD &= ~(1 << 6);
-				duty_cycle = +motor_power;
 			}
 			else{
 				PORTD &= ~(1 << 5);
 				PORTD |= 1 << 6;
-				duty_cycle = -motor_power;
+				motor_power *= -1;
 			}
 			
-			PWM_SetDutyCycle(duty_cycle+10);
+			motor_power += 10;
+			
+			if(motor_power > 100){
+				motor_power = 100;
+			}
+			
+			PWM_SetDutyCycle(motor_power);
 		}
 		
 		//............................................................................//
 		
 		usart_pre += 1;
-		usart_pre %= 20;
+		usart_pre %= 1;
 		
 		if(usart_pre == 0){
 			
 			double tmp[] = {
 				pitch,
 				Kp, Ki, Kd,
-				sum_error, motor_power, duty_cycle,
+				sum_error, motor_power,
 				dt
 			};
 			
