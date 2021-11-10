@@ -18,6 +18,7 @@ double Acc_x, Acc_y, Acc_z, Gyro_x, Gyro_y, Gyro_z, Temperature;
 double accAngleX, accAngleY, accAngleZ, gyroAngleX, gyroAngleY, gyroAngleZ;
 double AccErrorX, AccErrorY, AccErrorZ, GyroErrorX, GyroErrorY, GyroErrorZ;
 double roll,pitch;
+double pid, _p, _i, _d;
 double error, sum_error, pre_error, motor_power;
 double target = 0.0;
 double Kp, Ki, Kd;
@@ -52,7 +53,8 @@ void Gyro_Init()
 
 	I2C_Start_Wait(0xD0);
 	I2C_Write(CONFIG); 		/* Write to Configuration register */
-	I2C_Write(0x02); 		/* acc_bandwidth = 94, gyro_bandwidth = 98, Fs = 1KHz, dealy_gyro = 3ms, delay_acc = 2.8ms*/
+	// I2C_Write(0x02); 		/* acc_bandwidth = 94, gyro_bandwidth = 98, Fs = 1KHz, dealy_gyro = 2.8ms, delay_acc = 3ms*/
+	I2C_Write(0x01); 		/* acc_bandwidth = 184, gyro_bandwidth = 188, Fs = 1KHz, dealy_gyro = 1.9ms, delay_acc = 2ms*/
 	I2C_Stop();
 
 	I2C_Start_Wait(0xD0);
@@ -251,7 +253,6 @@ void Gyro_Init()
 	I2C_Stop();
 }
 
-
 void MPU_Start_Loc()
 {
 	I2C_Start_Wait(0xD0); 	  /* I2C start with device write address */
@@ -400,7 +401,18 @@ int main()
 	PWM_SetDutyCycle(0);
 	PWM_Start();
 	
+	uint16_t adc[4];	
 	char buffer[20], _double[10];
+	
+	double* tmp[] = {
+		&pitch,
+		&Kp, &Ki, &Kd,
+		&sum_error, &_p, &_i, &_d, &pid,
+		&gyroAngleY, &accAngleY,
+		&dt
+	};
+	
+	int tmp_sz = sizeof(tmp) / sizeof(tmp[0]);
 	
 	while(1)
 	{
@@ -416,22 +428,21 @@ int main()
 		gyroAngleY = gyroAngleY + Gyro_y * dt - GyroErrorY;
 		
 		// Complementary filter - combine accelerometer and gyro angle values
-		gyroAngleX = 0.96 * gyroAngleX + 0.04 * accAngleX;
-		gyroAngleY = 0.96 * gyroAngleY + 0.04 * accAngleY;
+		gyroAngleX = 0.97 * gyroAngleX + 0.03 * accAngleX;
+		gyroAngleY = 0.97 * gyroAngleY + 0.03 * accAngleY;
 		
 		roll = gyroAngleX;
 		pitch = gyroAngleY;
-		
-		uint16_t adc[4];
+
 		for(int i = 0; i < 4; i++){
 			adc[i] = ADC_GetAdcValue(i);
 		}
 		
-		Kp = (double) adc[1] * (10.0 / 1024.0);
-		Ki = (double) adc[2] * (6.0 / 1024.0);
-		Kd = (double) adc[3] * (0.3 / 1024.0);
+		Kp = (double) adc[1] * (6.0 / 1024.0);
+		Ki = (double) adc[2] * (40.0 / 1024.0);
+		Kd = (double) adc[3] * (0.2 / 1024.0);
 		
-		pitch += (double) 65 + adc[0] * (15.0 / 1024.0);
+		pitch += (double) 75 + (double) adc[0] * (15.0 / 1024.0);
 		
 		error = pitch - target;
 		
@@ -448,17 +459,20 @@ int main()
 			PORTB &= ~(1<<PB1);
 			
 			sum_error += error * dt;
-			
-			double mx_val = 20;
-			if(sum_error > mx_val)
-			sum_error = mx_val;
-			if(sum_error < -mx_val)
-			sum_error = -mx_val;
-			
-			motor_power = Kp * error + Ki * sum_error + Kd * (error - pre_error) / dt;
 
+			const double mx_val = 20;
+			if(sum_error > mx_val)
+				sum_error = mx_val;
+			if(sum_error < -mx_val)
+				sum_error = -mx_val;
+			
+			_p = Kp * error;
+			_i = Ki * sum_error;
+			_d = Kd * (error - pre_error)/dt;
+			pid = _p + _i + _d;			
 			pre_error = error;
 			
+			motor_power = pid;
 			if(motor_power > 0){
 				PORTD |= 1 << 5;
 				PORTD &= ~(1 << 6);
@@ -469,7 +483,7 @@ int main()
 				motor_power *= -1;
 			}
 			
-			motor_power += 10;
+			motor_power += 30;
 			
 			if(motor_power > 100){
 				motor_power = 100;
@@ -480,32 +494,11 @@ int main()
 		
 		//............................................................................//
 		
-		usart_pre += 1;
-		usart_pre %= 1;
-		
-		if(usart_pre == 0){
-			
-			double tmp[] = {
-				pitch,
-				Kp, Ki, Kd,
-				sum_error, motor_power,
-				dt
-			};
-			
-			int tmp_sz = sizeof(tmp) / sizeof(tmp[0]);
-			
-			for(int i = 0; i < tmp_sz; i++){
-				dtostrf(tmp[i], 3, 3, _double);
-				sprintf(buffer, "%s/", _double);
-				USART_SendString(buffer);
-			}
-			USART_SendString("\n");
-			
+		for(int i = 0; i < tmp_sz; i++){
+			dtostrf(*(tmp[i]), 3, 3, _double);
+			sprintf(buffer, "%s/", _double);
+			USART_SendString(buffer);
 		}
-		else{
-			// added delay to set the sampling frequency
-			_delay_ms(3);
-		}
-		
+		USART_SendString("\n");		
 	}
 }

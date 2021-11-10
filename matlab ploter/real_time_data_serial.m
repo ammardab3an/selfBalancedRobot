@@ -1,12 +1,12 @@
 fclose(s);
 
-SerialPort='com7'; %serial port
+SerialPort='com9'; %serial port
 MaxDeviation = 10000;%Maximum Allowable Change from one value to next 
 TimeInterval = 0;%time interval between each input.
 loop = 120;%count values
 %%Set up the serial port object
 
-s = serial(SerialPort, 'BaudRate', 57200);
+s = serial(SerialPort, 'BaudRate', 57600);
 fopen(s);
 
 time = now;
@@ -30,7 +30,7 @@ hold on;
 plotHandle = plot(axesHandle,time,voltage,'Marker','.','LineWidth',1,'Color',[0 1 0]);
 
 xlim(axesHandle,[min(time) max(time+0.001)]);
-ylim(axesHandle,[-70, +70]);
+ylim(axesHandle,[-100, +100]);
 
 % Create xlabel
 xlabel('Time','FontWeight','bold','FontSize',14,'Color',[1 1 0]);
@@ -53,16 +53,16 @@ k=1;
 while 1
     
     %%Serial data accessing 
-    
-    input_raw = fscanf(s);
-    input_raw
-    input = sscanf(input_raw,'%f/%f/%f/%f/%f/%f/%f/%f/');
-    
+    input_row = fscanf(s);
+    input_row
+    input = sscanf(input_row,'%f/%f/%f/%f/%f/%f/%f/%f/%f/');
     sz = size(input);
     
-    if sz(1) == 8
-        voltage(count) = input(2);
+    if sz(1) == 9
+        
+        voltage(count) = input(1);
         time(count) = count;
+        
         set(plotHandle,'YData',voltage,'XData',time);
         set(figureHandle,'Visible','on');
         datetick('x','mm/DD HH:MM');
